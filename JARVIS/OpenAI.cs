@@ -17,11 +17,7 @@ namespace JARVIS
         public OpenAI(int maxHistoryLength)
         {
             var config = Config.Load("config.json");
-            var apiKey = config.OpenAIApiKey;
-            var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            _httpHandler = new HttpHandler(apiKey);
+            _httpHandler = new HttpHandler(config.OpenAIApiKey);
             _history = new History(maxHistoryLength);
         }
 
@@ -52,12 +48,12 @@ namespace JARVIS
             if (!response.IsSuccessStatusCode)
             {
                 var rc = await response.Content.ReadAsStringAsync();
-                var errorMessage = GetErrorMessage(rc);
+                var errorMessage = JObject.Parse(rc)?["error"]?["message"]?.ToString() ?? rc;
                 throw new Exception($"OpenAI request failed with status code {response.StatusCode}: {errorMessage}");
             }
 
             var responseContent = await response.Content.ReadAsStringAsync();
-            var result = ParseResponse(responseContent);
+            var result = JObject.Parse(responseContent)?["choices"]?.FirstOrDefault()?["text"]?.ToString() ?? throw new Exception("OpenAI response is missing 'text' property");
             _history.Add(prompt);
             return result;
         }
@@ -66,32 +62,5 @@ namespace JARVIS
         {
             _httpHandler.Dispose();
         }
-
-        private string GetErrorMessage(string responseContent)
-        {
-            try
-            {
-                var errorObject = JObject.Parse(responseContent);
-                return errorObject?["error"]?["message"]?.ToString() ?? responseContent;
-            }
-            catch (Exception)
-            {
-                return responseContent;
-            }
-        }
-
-        private static string ParseResponse(string json)
-        {
-            var jObject = JObject.Parse(json);
-            var choices = jObject["choices"].ToObject<List<CompletionChoice>>();
-            return choices[0]?.text ?? throw new Exception("OpenAI response is missing 'text' property");
-        }
-    }
-
-    class CompletionChoice
-    {
-        public string finish_reason { get; set; }
-        public string index { get; set; }
-        public string text { get; set; }
     }
 }
