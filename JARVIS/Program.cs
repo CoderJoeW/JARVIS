@@ -23,20 +23,23 @@ static async Task BeginBot()
             break;
         }
 
-        string[] stop = { " Human:", " AI:" };
-        string prompt = input;
-        string engine = "text-davinci-002"; // Updated engine
-        double temperature = 0.7; // Updated temperature
-        int maxTokens = 2000; // Updated max tokens
-        double topP = 1.0;
-        double frequencyPenalty = 0.0;
-        double presencePenalty = 0.6;
-
-        string output = await openAI.CreateCompletion(prompt, engine, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, stop);
-
+        var output = await GenerateOutput(openAI, input);
         Console.WriteLine($"JARVIS: {output}");
         synth.Speak(output);
     }
 
     openAI.Shutdown();
+}
+
+static async Task<string> GenerateOutput(OpenAI openAI, string prompt)
+{
+    var stop = new[] { " Human:", " AI:" };
+    var engine = "text-davinci-002";
+    var temperature = 0.7;
+    var maxTokens = 2000;
+    var topP = 1.0;
+    var frequencyPenalty = 0.0;
+    var presencePenalty = 0.6;
+
+    return await openAI.CreateCompletion(prompt, engine, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, stop);
 }
