@@ -18,10 +18,9 @@ namespace JARVIS
 
         public OpenAI()
         {
-            var configJson = File.ReadAllText("config.json");
-            var config = JObject.Parse(configJson);
+            var config = Config.Load("config.json");
 
-            _apiKey = config["OpenAI"]["ApiKey"].ToString();
+            _apiKey = config.OpenAIApiKey;
             var httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
