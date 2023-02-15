@@ -28,9 +28,12 @@ static async Task BeginBot(SpeechHandler speechHandler, OpenAI openAI, Config co
     Console.WriteLine(opening);
     await speechHandler.SpeakAsync(opening);
 
+    var speechRecognizer = new SpeechRecognizer(config.GoogleCloudTextToSpeechKey);
+    var audioRecorder = new AudioRecorder();
+
     while (true)
     {
-        byte[] audioData = await RecordAudioAsync();
+        byte[] audioData = await audioRecorder.RecordAudioAsync(TimeSpan.FromSeconds(5));
 
         if (audioData == null)
         {
@@ -49,7 +52,7 @@ static async Task BeginBot(SpeechHandler speechHandler, OpenAI openAI, Config co
 
         Console.WriteLine($"Trigger word recognized: {triggerWord}");
 
-        byte[] remainingAudioData = await RecordAudioAsync();
+        byte[] remainingAudioData = await audioRecorder.RecordAudioAsync(TimeSpan.FromSeconds(5));
 
         if (remainingAudioData == null)
         {
@@ -57,7 +60,7 @@ static async Task BeginBot(SpeechHandler speechHandler, OpenAI openAI, Config co
             continue;
         }
 
-        string input = await speechHandler.RecognizeSpeechAsync(remainingAudioData);
+        string input = await speechRecognizer.RecognizeSpeechAsync(remainingAudioData);
 
         if (string.IsNullOrWhiteSpace(input))
         {
@@ -105,46 +108,6 @@ static async Task<string> RecognizeTriggerWord(byte[] audioData,string credentia
     }
 
     return response.Results[0].Alternatives[0].Transcript.ToLower();
-}
-
-static async Task<byte[]> RecordAudioAsync()
-{
-    using (var waveIn = new WaveInEvent())
-    using (var memoryStream = new MemoryStream())
-    {
-        bool isRecording = false;
-
-        // Start recording audio
-        waveIn.WaveFormat = new WaveFormat(16000, 1);
-
-        waveIn.DataAvailable += (sender, e) =>
-        {
-            if (isRecording)
-            {
-                memoryStream.Write(e.Buffer, 0, e.BytesRecorded);
-            }
-        };
-
-        waveIn.RecordingStopped += (sender, e) =>
-        {
-            isRecording = false;
-        };
-
-        waveIn.StartRecording();
-        isRecording = true;
-
-        // Wait for 5 seconds of audio to be captured
-        await Task.Delay(TimeSpan.FromSeconds(5));
-
-        waveIn.StopRecording();
-
-        if (memoryStream.Length == 0)
-        {
-            return null;
-        }
-
-        return memoryStream.ToArray();
-    }
 }
 
 static async Task<string> GenerateOutput(OpenAI openAI, string prompt)
