@@ -23,13 +23,14 @@ namespace JARVIS
 
         public async Task<string> CreateCompletion(string prompt, string engine, int maxTokens, double temperature, double topP, double frequencyPenalty, double presencePenalty, string[] stop)
         {
+            prompt = _history.GetFullPrompt(prompt); // get updated prompt from History class
             var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/completions")
             {
                 Content = new StringContent(
                     JsonConvert.SerializeObject(new
                     {
                         model = engine,
-                        prompt = _history.GetFullPrompt(prompt),
+                        prompt,
                         temperature,
                         max_tokens = maxTokens,
                         top_p = topP,
@@ -54,7 +55,7 @@ namespace JARVIS
 
             var responseContent = await response.Content.ReadAsStringAsync();
             var result = JObject.Parse(responseContent)?["choices"]?.FirstOrDefault()?["text"]?.ToString() ?? throw new Exception("OpenAI response is missing 'text' property");
-            _history.Add(prompt);
+            _history.Add(prompt, result);
             return result;
         }
 
