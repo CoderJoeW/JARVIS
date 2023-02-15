@@ -75,19 +75,16 @@ namespace JARVIS
                 yield break;
             }
 
-            var words = prompt.Split();
+            var words = prompt.Split(' ');
             var sb = new StringBuilder();
             foreach (var word in words)
             {
-                if (sb.Length + word.Length + 1 <= maxLength)
-                {
-                    sb.Append(word).Append(" ");
-                }
-                else
+                if (sb.Length + word.Length + 1 > maxLength)
                 {
                     yield return sb.ToString().TrimEnd();
-                    sb.Clear().Append(word).Append(" ");
+                    sb.Clear();
                 }
+                sb.Append(word).Append(' ');
             }
 
             if (sb.Length > 0)
