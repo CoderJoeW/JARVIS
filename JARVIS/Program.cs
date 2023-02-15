@@ -58,32 +58,47 @@ static async Task<string> GenerateOutput(OpenAI openAI, string prompt)
 
 static async Task SpeakText(TextToSpeechClient client, string text)
 {
-    var response = await client.SynthesizeSpeechAsync(new SynthesizeSpeechRequest
+    if (client == null)
     {
-        Input = new SynthesisInput
+        throw new ArgumentNullException(nameof(client));
+    }
+
+    try
+    {
+        var response = await client.SynthesizeSpeechAsync(new SynthesizeSpeechRequest
         {
-            Text = text
-        },
-        Voice = new VoiceSelectionParams
+            Input = new SynthesisInput
+            {
+                Text = text
+            },
+            Voice = new VoiceSelectionParams
+            {
+                LanguageCode = "en-US",
+                SsmlGender = SsmlVoiceGender.Male
+            },
+            AudioConfig = new AudioConfig
+            {
+                AudioEncoding = AudioEncoding.Linear16
+            }
+        });
+
+        using (var audioStream = new MemoryStream(response.AudioContent.ToByteArray()))
+        using (var audioFile = new WaveFileReader(audioStream))
+        using (var outputDevice = new WaveOutEvent())
         {
-            LanguageCode = "en-US",
-            SsmlGender = SsmlVoiceGender.Male
-        },
-        AudioConfig = new AudioConfig
-        {
-            AudioEncoding = AudioEncoding.Linear16
+            outputDevice.Init(audioFile);
+            outputDevice.Play();
+
+            while (outputDevice.PlaybackState == PlaybackState.Playing)
+            {
+                await Task.Delay(100);
+            }
         }
-    });
-
-    using var audioStream = new MemoryStream(response.AudioContent.ToByteArray());
-    using var audioFile = new WaveFileReader(audioStream);
-    using var outputDevice = new WaveOutEvent();
-
-    outputDevice.Init(audioFile);
-    outputDevice.Play();
-
-    while (outputDevice.PlaybackState == PlaybackState.Playing)
+    }
+    catch (Exception ex)
     {
-        await Task.Delay(100);
+        Console.WriteLine($"Error while playing audio: {ex.Message}");
     }
 }
+
+
