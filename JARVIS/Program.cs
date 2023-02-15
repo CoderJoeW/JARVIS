@@ -12,26 +12,38 @@ using NAudio.Wave;
 
 var config = Config.Load("config.json");
 
-var clientBuilder = new TextToSpeechClientBuilder
-{
-    CredentialsPath = config.GoogleCloudTextToSpeechKey
-};
-TextToSpeechClient client = await clientBuilder.BuildAsync();
+JARVIS.TextToSpeech textToSpeech = new JARVIS.TextToSpeech(config.GoogleCloudTextToSpeechKey);
+SpeechToText speechToText = new SpeechToText(config.GoogleCloudTextToSpeechKey);
 
-await BeginBot(client);
+OpenAI openAI = new OpenAI(2000);
 
-static async Task BeginBot(TextToSpeechClient client)
+await BeginBot(textToSpeech, speechToText, openAI);
+
+static async Task BeginBot(JARVIS.TextToSpeech textToSpeech, SpeechToText speechToText, OpenAI openAI)
 {
     string opening = "Hello, My name is JARVIS. How can I help you today?";
     Console.WriteLine(opening);
-    await SpeakText(client, opening);
-
-    OpenAI openAI = new OpenAI(2000);
+    await textToSpeech.SpeakAsync(opening);
 
     while (true)
     {
-        string input = Console.ReadLine();
-        if (input == "exit")
+        byte[] audioData = await RecordAudioAsync();
+
+        if (audioData == null)
+        {
+            Console.WriteLine("Failed to recognize speech input.");
+            continue;
+        }
+
+        string input = await speechToText.RecognizeSpeechAsync(audioData);
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Console.WriteLine("Failed to recognize speech input.");
+            continue;
+        }
+
+        if (input.ToLower() == "exit")
         {
             break;
         }
@@ -39,7 +51,35 @@ static async Task BeginBot(TextToSpeechClient client)
         var output = await GenerateOutput(openAI, input);
         Console.WriteLine($"JARVIS: {output}");
 
-        await SpeakText(client, output);
+        await textToSpeech.SpeakAsync(output);
+    }
+}
+
+static async Task<byte[]> RecordAudioAsync()
+{
+    using (var waveIn = new WaveInEvent())
+    using (var memoryStream = new MemoryStream())
+    {
+        waveIn.WaveFormat = new WaveFormat(16000, 1);
+
+        waveIn.DataAvailable += (sender, e) =>
+        {
+            memoryStream.Write(e.Buffer, 0, e.BytesRecorded);
+        };
+
+        waveIn.StartRecording();
+
+        Console.WriteLine("Listening for input...");
+        await Task.Delay(TimeSpan.FromSeconds(5)); // Wait for 5 seconds of audio to be captured
+
+        waveIn.StopRecording();
+
+        if (memoryStream.Length == 0)
+        {
+            return null;
+        }
+
+        return memoryStream.ToArray();
     }
 }
 
@@ -55,50 +95,3 @@ static async Task<string> GenerateOutput(OpenAI openAI, string prompt)
 
     return await openAI.CreateCompletion(prompt, engine, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, stop);
 }
-
-static async Task SpeakText(TextToSpeechClient client, string text)
-{
-    if (client == null)
-    {
-        throw new ArgumentNullException(nameof(client));
-    }
-
-    try
-    {
-        var response = await client.SynthesizeSpeechAsync(new SynthesizeSpeechRequest
-        {
-            Input = new SynthesisInput
-            {
-                Text = text
-            },
-            Voice = new VoiceSelectionParams
-            {
-                LanguageCode = "en-US",
-                SsmlGender = SsmlVoiceGender.Male
-            },
-            AudioConfig = new AudioConfig
-            {
-                AudioEncoding = AudioEncoding.Linear16
-            }
-        });
-
-        using (var audioStream = new MemoryStream(response.AudioContent.ToByteArray()))
-        using (var audioFile = new WaveFileReader(audioStream))
-        using (var outputDevice = new WaveOutEvent())
-        {
-            outputDevice.Init(audioFile);
-            outputDevice.Play();
-
-            while (outputDevice.PlaybackState == PlaybackState.Playing)
-            {
-                await Task.Delay(100);
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error while playing audio: {ex.Message}");
-    }
-}
-
-
