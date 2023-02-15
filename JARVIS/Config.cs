@@ -6,6 +6,7 @@ namespace JARVIS
     public class Config
     {
         public string OpenAIApiKey { get; set; }
+        public string GoogleCloudTextToSpeechKey { get; set; }
 
         public static Config Load(string path)
         {
@@ -14,7 +15,8 @@ namespace JARVIS
 
             return new Config
             {
-                OpenAIApiKey = config["OpenAI"]["ApiKey"].ToString()
+                OpenAIApiKey = config["OpenAI"]["ApiKey"].ToString(),
+                GoogleCloudTextToSpeechKey = config["GoogleTextToSpeech"]["KeyFile"].ToString()
             };
         }
     }

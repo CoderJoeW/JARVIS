@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.Cloud.TextToSpeech.V1" Version="3.2.0" />
+    <PackageReference Include="NAudio" Version="2.1.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="System.Speech" Version="7.0.0" />
   </ItemGroup>

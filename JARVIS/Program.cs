@@ -1,19 +1,29 @@
 ﻿using System;
 using System.Globalization;
-using System.Speech.Synthesis;
+using System.IO;
 using System.Threading.Tasks;
+using Google.Apis.Auth.OAuth2;
+using Google.Cloud.TextToSpeech.V1;
+using Grpc.Auth;
+using Grpc.Core;
+using Grpc.Net.Client;
 using JARVIS;
+using NAudio.Wave;
 
 await BeginBot();
 
 static async Task BeginBot()
 {
-    Console.WriteLine("Hello! My name is JARVIS. How can I help you?");
-    OpenAI openAI = new OpenAI(2000); // Replace with your API key
+    OpenAI openAI = new OpenAI(2000);
 
-    SpeechSynthesizer synth = new SpeechSynthesizer();
+    var config = Config.Load("config.json");
 
-    synth.Speak("Hello! My name is JARVIS. How can I help you?");
+    // Authenticate with Google Cloud using a service account
+    var clientBuilder = new TextToSpeechClientBuilder
+    {
+        CredentialsPath = config.GoogleCloudTextToSpeechKey
+    };
+    var client = await clientBuilder.BuildAsync();
 
     while (true)
     {
@@ -25,14 +35,42 @@ static async Task BeginBot()
 
         var output = await GenerateOutput(openAI, input);
         Console.WriteLine($"JARVIS: {output}");
-        synth.Speak(output);
+
+        var response = await client.SynthesizeSpeechAsync(new SynthesizeSpeechRequest
+        {
+            Input = new SynthesisInput
+            {
+                Text = output
+            },
+            Voice = new VoiceSelectionParams
+            {
+                LanguageCode = "en-US",
+                SsmlGender = SsmlVoiceGender.Male
+            },
+            AudioConfig = new AudioConfig
+            {
+                AudioEncoding = AudioEncoding.Linear16
+            }
+        });
+
+        using var audioStream = new MemoryStream(response.AudioContent.ToByteArray());
+        using var audioFile = new WaveFileReader(audioStream);
+        using var outputDevice = new WaveOutEvent();
+
+        outputDevice.Init(audioFile);
+        outputDevice.Play();
+
+        while (outputDevice.PlaybackState == PlaybackState.Playing)
+        {
+            await Task.Delay(100);
+        }
     }
 }
 
 static async Task<string> GenerateOutput(OpenAI openAI, string prompt)
 {
     var stop = new[] { " Human:", " AI:" };
-    var engine = "text-davinci-002";
+    var engine = "text-davinci-003";
     var temperature = 0.7;
     var maxTokens = 2000;
     var topP = 1.0;
