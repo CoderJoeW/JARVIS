@@ -9,7 +9,7 @@ await BeginBot();
 static async Task BeginBot()
 {
     Console.WriteLine("Hello! My name is JARVIS. How can I help you?");
-    OpenAI openAI = new OpenAI(); // Replace with your API key
+    OpenAI openAI = new OpenAI(2000); // Replace with your API key
 
     SpeechSynthesizer synth = new SpeechSynthesizer();
 

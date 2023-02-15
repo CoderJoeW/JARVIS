@@ -14,9 +14,9 @@ namespace JARVIS
     {
         private readonly string _apiKey;
         private readonly HttpHandler _httpHandler;
-        private readonly List<string> _history = new List<string>();
+        private readonly History _history;
 
-        public OpenAI()
+        public OpenAI(int maxHistoryLength)
         {
             var config = Config.Load("config.json");
 
@@ -25,6 +25,7 @@ namespace JARVIS
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             _httpHandler = new HttpHandler(_apiKey);
+            _history = new History(maxHistoryLength);
         }
 
         public async Task<string> CreateCompletion(string prompt, string engine, int maxTokens, double temperature, double topP, double frequencyPenalty, double presencePenalty, string[] stop)
@@ -37,7 +38,7 @@ namespace JARVIS
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
                 var result = ParseResponse(responseContent);
-                UpdateHistory(GetPrompt(prompt));
+                _history.Add(prompt);
                 return result;
             }
             else
@@ -61,7 +62,7 @@ namespace JARVIS
                     JsonConvert.SerializeObject(new
                     {
                         model = engine,
-                        prompt = GetPrompt(prompt),
+                        prompt = _history.GetFullPrompt(prompt),
                         temperature,
                         max_tokens = maxTokens,
                         top_p = topP,
@@ -86,27 +87,6 @@ namespace JARVIS
             catch (Exception)
             {
                 return responseContent;
-            }
-        }
-
-        private void UpdateHistory(string prompt)
-        {
-            _history.Add(prompt);
-            if (_history.Count > 1)
-            {
-                _history.RemoveRange(0, _history.Count - 1);
-            }
-        }
-
-        private string GetPrompt(string prompt)
-        {
-            if (_history.Count == 0)
-            {
-                return prompt;
-            }
-            else
-            {
-                return string.Join("", _history) + prompt;
             }
         }
 
