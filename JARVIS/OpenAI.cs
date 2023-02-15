@@ -29,8 +29,7 @@ namespace JARVIS
 
         public async Task<string> CreateCompletion(string prompt, string engine, int maxTokens, double temperature, double topP, double frequencyPenalty, double presencePenalty, string[] stop)
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/completions");
-            request.Content = new StringContent($"{{\"model\": \"{engine}\", \"prompt\": \"{GetPrompt(prompt)}\", \"temperature\": {temperature.ToString(CultureInfo.InvariantCulture)}, \"max_tokens\": {maxTokens}, \"top_p\": {topP.ToString(CultureInfo.InvariantCulture)}, \"frequency_penalty\": {frequencyPenalty.ToString(CultureInfo.InvariantCulture)}, \"presence_penalty\": {presencePenalty.ToString(CultureInfo.InvariantCulture)}, \"stop\": {JsonArray(stop)}, \"n\": 1}}", Encoding.UTF8, "application/json");
+            var request = CreateRequest(prompt, engine, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, stop);
 
             var response = await _httpClient.SendAsync(request);
             var responseContent = await response.Content.ReadAsStringAsync();
@@ -43,16 +42,7 @@ namespace JARVIS
             }
             else
             {
-                string errorMessage;
-                try
-                {
-                    var errorObject = JObject.Parse(responseContent);
-                    errorMessage = errorObject?["error"]?["message"]?.ToString() ?? responseContent;
-                }
-                catch (Exception)
-                {
-                    errorMessage = responseContent;
-                }
+                var errorMessage = GetErrorMessage(responseContent);
                 throw new Exception($"OpenAI request failed with status code {response.StatusCode}: {errorMessage}");
             }
         }
@@ -62,9 +52,40 @@ namespace JARVIS
             _httpClient.Dispose();
         }
 
-        private static JArray JsonArray(string[] array)
+        private HttpRequestMessage CreateRequest(string prompt, string engine, int maxTokens, double temperature, double topP, double frequencyPenalty, double presencePenalty, string[] stop)
         {
-            return new JArray(array);
+            return new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/completions")
+            {
+                Content = new StringContent(
+                    JsonConvert.SerializeObject(new
+                    {
+                        model = engine,
+                        prompt = GetPrompt(prompt),
+                        temperature,
+                        max_tokens = maxTokens,
+                        top_p = topP,
+                        frequency_penalty = frequencyPenalty,
+                        presence_penalty = presencePenalty,
+                        stop = stop,
+                        n = 1
+                    }),
+                    Encoding.UTF8,
+                    "application/json"
+                )
+            };
+        }
+
+        private string GetErrorMessage(string responseContent)
+        {
+            try
+            {
+                var errorObject = JObject.Parse(responseContent);
+                return errorObject?["error"]?["message"]?.ToString() ?? responseContent;
+            }
+            catch (Exception)
+            {
+                return responseContent;
+            }
         }
 
         private void UpdateHistory(string prompt)
