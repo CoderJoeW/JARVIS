@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace JARVIS
 {
-    class OpenAI
+    class OpenAI: IDisposable
     {
         private readonly HttpHandler _httpHandler;
         private readonly History _history;
@@ -93,7 +93,7 @@ namespace JARVIS
             }
         }
 
-        public void Shutdown()
+        public void Dispose()
         {
             _httpHandler.Dispose();
         }

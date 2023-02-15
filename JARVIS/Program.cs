@@ -27,8 +27,6 @@ static async Task BeginBot()
         Console.WriteLine($"JARVIS: {output}");
         synth.Speak(output);
     }
-
-    openAI.Shutdown();
 }
 
 static async Task<string> GenerateOutput(OpenAI openAI, string prompt)
