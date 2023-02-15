@@ -13,7 +13,7 @@ namespace JARVIS
     class OpenAI
     {
         private readonly string _apiKey;
-        private readonly HttpClient _httpClient;
+        private readonly HttpHandler _httpHandler;
         private readonly List<string> _history = new List<string>();
 
         public OpenAI()
@@ -22,26 +22,28 @@ namespace JARVIS
             var config = JObject.Parse(configJson);
 
             _apiKey = config["OpenAI"]["ApiKey"].ToString();
-            _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            _httpHandler = new HttpHandler(_apiKey);
         }
 
         public async Task<string> CreateCompletion(string prompt, string engine, int maxTokens, double temperature, double topP, double frequencyPenalty, double presencePenalty, string[] stop)
         {
             var request = CreateRequest(prompt, engine, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, stop);
 
-            var response = await _httpClient.SendAsync(request);
-            var responseContent = await response.Content.ReadAsStringAsync();
+            var response = await _httpHandler.SendAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
+                var responseContent = await response.Content.ReadAsStringAsync();
                 var result = ParseResponse(responseContent);
                 UpdateHistory(GetPrompt(prompt));
                 return result;
             }
             else
             {
+                var responseContent = await response.Content.ReadAsStringAsync();
                 var errorMessage = GetErrorMessage(responseContent);
                 throw new Exception($"OpenAI request failed with status code {response.StatusCode}: {errorMessage}");
             }
@@ -49,7 +51,7 @@ namespace JARVIS
 
         public void Shutdown()
         {
-            _httpClient.Dispose();
+            _httpHandler.Dispose();
         }
 
         private HttpRequestMessage CreateRequest(string prompt, string engine, int maxTokens, double temperature, double topP, double frequencyPenalty, double presencePenalty, string[] stop)
