@@ -14,18 +14,19 @@ using NAudio.Wave;
 
 var config = Config.Load("config.json");
 
-JARVIS.TextToSpeech textToSpeech = new JARVIS.TextToSpeech(config.GoogleCloudTextToSpeechKey);
-SpeechToText speechToText = new SpeechToText(config.GoogleCloudTextToSpeechKey);
+SpeechHandler speechHandler = new SpeechHandler(
+    config.GoogleCloudTextToSpeechKey
+);
 
 OpenAI openAI = new OpenAI(2000);
 
-await BeginBot(textToSpeech, speechToText, openAI, config);
+await BeginBot(speechHandler, openAI, config);
 
-static async Task BeginBot(JARVIS.TextToSpeech textToSpeech, SpeechToText speechToText, OpenAI openAI, Config config)
+static async Task BeginBot(SpeechHandler speechHandler, OpenAI openAI, Config config)
 {
     string opening = "Hello, My name is JARVIS. How can I help you today?";
     Console.WriteLine(opening);
-    await textToSpeech.SpeakAsync(opening);
+    await speechHandler.SpeakAsync(opening);
 
     while (true)
     {
@@ -56,7 +57,7 @@ static async Task BeginBot(JARVIS.TextToSpeech textToSpeech, SpeechToText speech
             continue;
         }
 
-        string input = await speechToText.RecognizeSpeechAsync(remainingAudioData);
+        string input = await speechHandler.RecognizeSpeechAsync(remainingAudioData);
 
         if (string.IsNullOrWhiteSpace(input))
         {
@@ -72,7 +73,7 @@ static async Task BeginBot(JARVIS.TextToSpeech textToSpeech, SpeechToText speech
         var output = await GenerateOutput(openAI, input);
         Console.WriteLine($"JARVIS: {output}");
 
-        await textToSpeech.SpeakAsync(output);
+        await speechHandler.SpeakAsync(output);
     }
 }
 
