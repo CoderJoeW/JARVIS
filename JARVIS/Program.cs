@@ -30,37 +30,44 @@ static async Task BeginBot(SpeechHandler speechHandler, OpenAI openAI, Config co
 
     var speechRecognizer = new SpeechRecognizer(config.GoogleCloudTextToSpeechKey);
     var audioRecorder = new AudioRecorder();
+    byte[] audioData = null;
+    bool isRecording = false;
 
     while (true)
     {
-        byte[] audioData = await audioRecorder.RecordAudioAsync(TimeSpan.FromSeconds(5));
-
-        if (audioData == null)
+        if (!isRecording)
         {
-            Console.WriteLine("Failed to recognize speech input.");
+            Console.WriteLine("Recording audio...");
+            audioData = await audioRecorder.RecordAudioAsync();
+            if (audioData == null)
+            {
+                Console.WriteLine("Failed to record audio.");
+                continue;
+            }
+
+            Console.WriteLine("Checking for trigger word...");
+            var triggerWord = await RecognizeTriggerWord(audioData, config.GoogleCloudTextToSpeechKey);
+
+            if (triggerWord == null)
+            {
+                Console.WriteLine("Failed to recognize trigger word.");
+                continue;
+            }
+
+            Console.WriteLine($"Trigger word recognized: {triggerWord}");
+            isRecording = true;
+        }
+
+        byte[] chunk = await audioRecorder.RecordAudioAsync();
+        if (chunk == null)
+        {
+            Console.WriteLine("Failed to record audio.");
             continue;
         }
 
-        Console.WriteLine("Checking for trigger word...");
-        var triggerWord = await RecognizeTriggerWord(audioData, config.GoogleCloudTextToSpeechKey);
+        audioData = audioData.Concat(chunk).ToArray();
 
-        if (triggerWord == null)
-        {
-            Console.WriteLine("Failed to recognize trigger word.");
-            continue;
-        }
-
-        Console.WriteLine($"Trigger word recognized: {triggerWord}");
-
-        byte[] remainingAudioData = await audioRecorder.RecordAudioAsync(TimeSpan.FromSeconds(5));
-
-        if (remainingAudioData == null)
-        {
-            Console.WriteLine("Failed to recognize speech input.");
-            continue;
-        }
-
-        string input = await speechRecognizer.RecognizeSpeechAsync(remainingAudioData);
+        var input = await speechRecognizer.RecognizeSpeechAsync(audioData);
 
         if (string.IsNullOrWhiteSpace(input))
         {
@@ -77,10 +84,12 @@ static async Task BeginBot(SpeechHandler speechHandler, OpenAI openAI, Config co
         Console.WriteLine($"JARVIS: {output}");
 
         await speechHandler.SpeakAsync(output);
+
+        isRecording = false;
     }
 }
 
-static async Task<string> RecognizeTriggerWord(byte[] audioData,string credentials)
+static async Task<string> RecognizeTriggerWord(byte[] audioData, string credentials)
 {
     var client = new SpeechClientBuilder
     {
@@ -93,11 +102,11 @@ static async Task<string> RecognizeTriggerWord(byte[] audioData,string credentia
         SampleRateHertz = 16000,
         LanguageCode = "en-US",
         SpeechContexts = {
-                    new SpeechContext
-                    {
-                        Phrases = { "jarvis" },
-                    },
-                   },
+            new SpeechContext
+            {
+                Phrases = { "jarvis" },
+            },
+        },
     };
     var audio = RecognitionAudio.FromBytes(audioData);
     var response = await client.RecognizeAsync(config, audio);
